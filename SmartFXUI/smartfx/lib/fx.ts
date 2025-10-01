@@ -21,11 +21,39 @@ function buildQuoteHash(fromToken: string, toToken: string, rateFixed8: bigint, 
 
 // Public FX API; you can also type a custom rate in the UI.
 export async function fetchFxRate(): Promise<number> {
-  const url = "https://api.exchangerate.host/latest?base=USD&symbols=BRL";
-  const r = await fetch(url, { cache: "no-cache" });
-  const j = await r.json();
-  const sym = Object.keys(j.rates)[0];
-  return Number(j.rates[sym]); // BRL per USD (cUSD->cREAL demo)
+  // Try multiple public providers in order
+  const attempts: Array<() => Promise<number>> = [
+    // 1) exchangerate.host
+    async () => {
+      const r = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=BRL", { cache: "no-cache" });
+      const j = await r.json();
+      const brl = j?.rates?.BRL;
+      if (typeof brl === "number" && isFinite(brl)) return brl;
+      throw new Error("exchangerate.host bad shape");
+    },
+    // 2) ER API
+    async () => {
+      const r = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-cache" });
+      const j = await r.json();
+      const brl = j?.rates?.BRL;
+      if (typeof brl === "number" && isFinite(brl)) return brl;
+      throw new Error("er-api bad shape");
+    },
+    // 3) Frankfurter
+    async () => {
+      const r = await fetch("https://api.frankfurter.app/latest?from=USD&to=BRL", { cache: "no-cache" });
+      const j = await r.json();
+      const brl = j?.rates?.BRL;
+      if (typeof brl === "number" && isFinite(brl)) return brl;
+      throw new Error("frankfurter bad shape");
+    },
+  ];
+
+  let lastErr: any;
+  for (const fn of attempts) {
+    try { return await fn(); } catch (e) { lastErr = e; }
+  }
+  throw new Error("All FX providers failed: " + (lastErr?.message || lastErr));
 }
 
 // Sign a quote in the browser with MetaMask (MUST be the eigenSigner address)
@@ -48,10 +76,9 @@ export function calcMinOut(amountInStr: string, rateNumber: number, slippageBps 
   const amountIn18 = parseUnits(amountInStr || "0", 18);
   const rateFixed8 = toFixed8(rateNumber);
   // (amountIn18 * rateFixed8 / 1e8) * (1 - s)
-  const out18 = (amountIn18 * rateFixed8) / 100000000n;
-  const outAfterSlippage = (out18 * BigInt(10000 - slippageBps)) / 10000n;
+  const out18 = (amountIn18 * rateFixed8) / BigInt(1e8);
+  const outAfterSlippage = (out18 * BigInt(10000 - slippageBps)) / BigInt(10000);
   return outAfterSlippage;
-}
 
 export async function approveAndSwap(amountStr: string, rateNumber: number, quote:any) {
   const { ethereum } = window as any;
@@ -77,4 +104,5 @@ export async function approveAndSwap(amountStr: string, rateNumber: number, quot
     await signer.getAddress()
   );
   return tx.wait();
+}
 }

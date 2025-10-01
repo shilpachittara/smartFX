@@ -1,103 +1,101 @@
-import Image from "next/image";
+"use client";
+import { useMemo, useState } from "react";
+import { connectWallet, ensureCeloNetwork } from "../lib/wallet";
+import { fetchFxRate, signQuoteInBrowser } from "../lib/fx";
 
-export default function Home() {
+const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER || "https://alfajores.celoscan.io";
+
+export default function Home(){
+  const [addr,setAddr] = useState("");
+  const [amt,setAmt] = useState("10");
+  const [rate,setRate] = useState<number|undefined>();
+  const [quote,setQuote] = useState<any>(null);
+  const [hash,setHash] = useState("");
+  const [loading,setLoading] = useState(false);
+  const [err,setErr] = useState("");
+
+  async function connect(){
+    try { await ensureCeloNetwork(); setAddr(await connectWallet()); }
+    catch(e:any){ setErr(e?.message||String(e)); }
+  }
+
+  async function getRate(){
+    setErr(""); setLoading(true);
+    try { setRate(await fetchFxRate()); }
+    catch(e:any){ setErr("Rate fetch failed: "+(e?.message||String(e))); }
+    finally { setLoading(false); }
+  }
+
+  async function signRate(){
+    if(rate===undefined){ setErr("Fetch or enter a rate first"); return; }
+    setErr(""); setLoading(true);
+    try { setQuote(await signQuoteInBrowser(rate)); }
+    catch(e:any){ setErr("Sign failed: "+(e?.message||String(e))); }
+    finally { setLoading(false); }
+  }
+
+  async function swap(){
+    if(!quote || rate===undefined){ setErr("Sign a quote first"); return; }
+    setErr(""); setLoading(true);
+    try { 
+      const rec: any = await approveAndSwap(amt, rate, quote); 
+      setHash((rec && typeof rec === "object" && "hash" in rec) ? (rec.hash || "") : ""); 
+    }
+    catch(e:any){ setErr("Swap failed: "+(e?.message||String(e))); }
+    finally { setLoading(false); }
+  }
+
+  const rateText = useMemo(()=> rate!==undefined ? `${rate.toFixed(4)} cREAL / 1 cUSD` : "-", [rate]);
+  const btn = (label:string, onClick:any, disabled:boolean=false) => (
+    <button onClick={onClick} disabled={disabled}
+      style={{padding:"10px 14px", borderRadius:12, border:"1px solid #ddd", background:"#111", color:"#fff", marginRight:8}}>
+      {label}
+    </button>
+  );
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main style={{maxWidth:620, margin:"40px auto", padding:24, fontFamily:"Inter, system-ui"}}>
+      <h1 style={{fontSize:26, fontWeight:800}}>SmartFX</h1>
+      <p style={{opacity:.75, marginTop:6}}>Your wallet signs the rate. Contract verifies it on-chain.</p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      <div style={{marginTop:16}}>
+        {!addr ? btn("Connect Wallet (Celo)", connect) : <div>Connected: <b>{addr.slice(0,6)}…{addr.slice(-4)}</b></div>}
+      </div>
+
+      <div style={{marginTop:18}}>
+        <label>Amount (cUSD)</label>
+        <input value={amt} onChange={e=>setAmt(e.target.value)}
+          style={{display:"block", width:"100%", marginTop:6, padding:12, borderRadius:12, border:"1px solid #e5e5e5"}} />
+      </div>
+
+      <div style={{marginTop:14}}>
+        {btn(loading ? "Fetching…" : "Get Rate (USD→BRL)", getRate, loading)}
+        <span>Rate: <b>{rateText}</b></span>
+      </div>
+
+      <div style={{marginTop:10}}>
+        <small style={{opacity:.7}}>Or type a custom rate:</small>
+        <input placeholder="e.g. 5.10" onChange={(e)=>setRate(Number(e.target.value))}
+          style={{display:"block", width:"100%", marginTop:6, padding:10, borderRadius:10, border:"1px solid #eee"}} />
+      </div>
+
+      <div style={{marginTop:14}}>
+        {btn(loading ? "Signing…" : "Sign Verified Rate", signRate, loading || rate===undefined)}
+        {btn(loading ? "Swapping…" : "Swap at Verified Rate", swap, loading || !quote)}
+      </div>
+
+      {quote && <details style={{marginTop:12}}><summary>Show proof</summary>
+        <pre style={{background:"#000", padding:12, borderRadius:10, fontSize:12}}>
+{JSON.stringify(quote,null,2)}
+        </pre>
+      </details>}
+
+      {hash && <p style={{marginTop:12}}>Tx: <a href={`${EXPLORER}/tx/${hash}`} target="_blank" rel="noreferrer">{hash.slice(0,12)}…</a></p>}
+      {err && <p style={{marginTop:12, color:"#c00"}}>{err}</p>}
+    </main>
   );
 }
+function approveAndSwap(amt: string, rate: number, quote: any) {
+  throw new Error("Function not implemented.");
+}
+
