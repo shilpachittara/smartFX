@@ -26,10 +26,14 @@ The contract holds liquidity in a vault. Incoming token is swapped for outgoing 
 	•	Slippage protection (minAmountOut).
 	•	Expiry windows (maxQuoteAge).
 	•	Owner controls signer and vault balances.
-	•	Cute minimal UI
-	•	Connect wallet (MetaMask / MiniPay).
-	•	Enter amount → Fetch rate → Sign proof → Swap.
-	•	Shows proof JSON and on-chain tx link.
+	•	Modern DeFi UI with Web3 aesthetics
+	•	Cyber-blue color scheme with Celo green accents
+	•	Real-time output calculation with animated feedback
+	•	Loading spinners and user-friendly error messages
+	•	Glowing buttons with hover effects and pulse animations
+	•	Success notifications with transaction links
+	•	Input validation with immediate feedback
+	•	Mobile-responsive design
 
 ⸻
 
@@ -51,7 +55,7 @@ Prerequisites
 
 1. Clone and install
 git clone https://github.com/shilpachittara/smartFX
-cd smartfx
+cd smartFX/SmartFXUI/smartfx
 npm install
 
 2. Configure environment
@@ -68,6 +72,8 @@ NEXT_PUBLIC_TO_TOKEN=0x7D00cd74FF385c955EA3d79e47BF06bD7386387D     # cREAL
 3. Run locally
 npm run dev
 # open http://localhost:3000
+
+**Note:** The UI will work for anyone, but successful on-chain swaps require your wallet to be set as the contract's `eigenSigner`. See the "Demo Mode Limitations" section below for details.
 
 
 🔗 Smart Contract
@@ -103,13 +109,93 @@ Extend to Ethereum / L2 stablecoins using Axelar or LayerZero bridging.
 Add AI agents to auto-rebalance vaults, monitor arbitrage, or auto-swap at best rates.
 
 
+🎨 UI/UX Features
+
+**Visual Design:**
+- **Cyber-blue theme** with electric blue (#0070F3) primary color
+- **Celo green accents** (#FBCC5C) for brand recognition
+- **Glowing logo** with pulsing animation (3s cycle)
+- **Dark background** (#0A0F1E) for modern DeFi aesthetic
+
+**Interactive Elements:**
+- **Glowing buttons** with gradient backgrounds and pulse animations
+- **Enhanced hover effects** with color transitions and floating animations
+- **Loading spinners** on all async operations
+- **Real-time output calculation** with number flash animations
+- **Success toast notifications** that slide in from top
+- **Input validation** with immediate error feedback
+
+**User Experience:**
+- **Friendly error messages** with emoji icons and clear solutions
+- **Connected wallet indicator** with animated status light
+- **EigenLayer proof viewer** with expandable JSON display
+- **Transaction links** to Celoscan block explorer
+- **Mobile-responsive** design with touch-friendly buttons
+
 📸 Demo Flow (1 min)
-	1.	Connect wallet on Celo.
-	2.	Enter amount in cUSD.
-	3.	Fetch live USD→BRL rate or type manually.
-	4.	Sign the quote (MetaMask → “Sign Message”).
-	5.	Call swapWithProof on-chain.
-	6.	Vault releases cREAL at the verified rate.
+	1.	Connect wallet on Celo (animated gradient button).
+	2.	Enter amount in cUSD (real-time validation).
+	3.	Fetch live USD→BRL rate or type manually (loading spinner).
+	4.	Sign the quote (MetaMask → "Sign Message", spinner during signing).
+	5.	Call swapWithProof on-chain (glowing swap button).
+	6.	Success! Toast notification appears with transaction link.
+
+
+⚠️ Important: Demo Mode Limitations
+
+**Current Implementation Status:**
+
+This is a **Proof-of-Concept** demonstrating the EigenLayer integration architecture. In the current deployment:
+
+**✅ What Works:**
+- UI/UX flow (wallet connection, rate fetching, signing interface)
+- Smart contract with full security measures (signature verification, replay protection, slippage guards)
+- Real FX rate fetching from multiple providers
+- Complete on-chain transaction execution
+
+**⚠️ Demo Constraint:**
+
+The deployed contract's `eigenSigner` is set to a **specific wallet address** (the deployer's wallet). This means:
+
+- ✅ **Anyone can view** the UI and interact with the interface
+- ✅ **Anyone can fetch** live FX rates
+- ✅ **Anyone can sign** quotes with their MetaMask
+- ❌ **Only the authorized signer's wallet** can successfully execute swaps on-chain
+
+**Why This Design?**
+
+This demonstrates the **trust model** of the full system:
+1. **Demo Mode** (current): Single MetaMask wallet acts as the EigenSigner to prove the concept
+2. **Production Mode** (roadmap): A decentralized EigenLayer AVS (Actively Validated Service) with multiple validators replaces the single signer
+
+**For Hackathon Judges/Testers:**
+
+To experience a successful swap transaction:
+1. **Option A**: Watch the deployer demonstrate with their authorized wallet
+2. **Option B**: Contact the team to temporarily set your wallet as the `eigenSigner` via the `setEigenSigner()` function
+3. **Option C**: Review the [contract on Celoscan](https://alfajores.celoscan.io/address/0xA127C6aECb272935466B679234Ece1BFdF1953b7) to verify transaction history
+
+**Pre-Demo Checklist:**
+
+Before presenting, ensure:
+- [ ] Wallet has Alfajores testnet CELO (for gas)
+- [ ] Wallet has testnet cUSD (get from [Celo Faucet](https://faucet.celo.org/alfajores))
+- [ ] Contract has sufficient cREAL liquidity
+- [ ] Your wallet address matches the contract's `eigenSigner` setting
+- [ ] Network is set to Celo Alfajores (Chain ID: 44787)
+
+**Common Errors (with friendly messages):**
+
+The UI now shows user-friendly error messages instead of technical errors:
+
+| Technical Error | User-Friendly Message |
+|-----------------|----------------------|
+| "bad sig" | 🔐 Signature verification failed. Your wallet must be set as the contract's eigenSigner for demo mode. |
+| "insufficient liquidity" | 💧 The contract doesn't have enough cREAL tokens. Please contact the team to add liquidity. |
+| "stale quote" | ⏰ Your signed rate expired (5 min limit). Please fetch a new rate and sign again. |
+| "quote used" | ♻️ This signature was already used. Please create a new quote. |
+| "user rejected action" | 🚫 You cancelled the request. Please try again when ready. |
+| "insufficient funds" | 💰 Insufficient balance. You need more CELO for gas or cUSD for the swap. |
 
 
 ⚠️ Disclaimer
