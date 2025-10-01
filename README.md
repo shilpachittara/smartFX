@@ -6,6 +6,30 @@ It enables trust-minimized swaps between stablecoins (e.g., cUSD ↔ cREAL) usin
 
 The app is fully frontend-only (no backend server required), using MetaMask or MiniPay for signing and execution.
 
+---
+
+## ⚠️ **IMPORTANT: Demo Mode Notice**
+
+This is a **Proof-of-Concept** demonstrating the EigenLayer integration architecture.
+
+**🎯 Current Status:**
+- ✅ **UI/UX & Smart Contract**: Fully functional with production-grade security
+- ✅ **Architecture Demonstration**: Complete proof-of-concept for EigenLayer AVS integration
+- ⚠️ **Demo Constraint**: Only the deployer's wallet can execute swaps on-chain (by design)
+
+**Why This Limitation?**
+
+This demonstrates the **trust model** for production:
+- **Demo Mode** (current): Single authorized wallet acts as EigenSigner for hackathon demo
+- **Production Mode** (roadmap): Decentralized EigenLayer AVS with multiple validators
+
+**For Judges/Testers:**
+1. **Best Option**: Let the team demo with their authorized wallet
+2. **Alternative**: Contact team to set your wallet as `eigenSigner` temporarily
+3. **Verification**: Check [transaction history on Celoscan](https://alfajores.celoscan.io/address/0xA127C6aECb272935466B679234Ece1BFdF1953b7)
+
+📖 See [full demo limitations](#️-important-demo-mode-limitations) below for technical details.
+
 ⸻
 
 ✨ Features
