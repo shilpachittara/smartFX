@@ -60,20 +60,60 @@ npm install
 
 2. Configure environment
 
-Create .env.local:
+Create a file named `.env.local` in the `SmartFXUI/smartfx/` directory:
 
+```bash
+# SmartFX Contract Address (Alfajores Testnet)
+NEXT_PUBLIC_CELOFX_ADDRESS=0xA127C6aECb272935466B679234Ece1BFdF1953b7
+
+# Network Configuration
+NEXT_PUBLIC_CHAIN_ID=44787
+NEXT_PUBLIC_RPC_URL=https://alfajores-forno.celo-testnet.org
+NEXT_PUBLIC_EXPLORER=https://alfajores.celoscan.io
+
+# Token Addresses (Celo Alfajores Testnet)
+NEXT_PUBLIC_FROM_TOKEN=0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1   # cUSD
+NEXT_PUBLIC_TO_TOKEN=0x7D00cd74FF385c955EA3d79e47BF06bD7386387D     # cREAL
+```
+
+Or use this command to create it automatically:
+
+```bash
+cat > .env.local << 'EOF'
 NEXT_PUBLIC_CELOFX_ADDRESS=0xA127C6aECb272935466B679234Ece1BFdF1953b7
 NEXT_PUBLIC_CHAIN_ID=44787
 NEXT_PUBLIC_RPC_URL=https://alfajores-forno.celo-testnet.org
 NEXT_PUBLIC_EXPLORER=https://alfajores.celoscan.io
-NEXT_PUBLIC_FROM_TOKEN=0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1   # cUSD
-NEXT_PUBLIC_TO_TOKEN=0x7D00cd74FF385c955EA3d79e47BF06bD7386387D     # cREAL
+NEXT_PUBLIC_FROM_TOKEN=0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1
+NEXT_PUBLIC_TO_TOKEN=0x7D00cd74FF385c955EA3d79e47BF06bD7386387D
+EOF
+```
 
 3. Run locally
 npm run dev
 # open http://localhost:3000
 
 **Note:** The UI will work for anyone, but successful on-chain swaps require your wallet to be set as the contract's `eigenSigner`. See the "Demo Mode Limitations" section below for details.
+
+---
+
+### 🚀 Deploying to Vercel
+
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Set **Root Directory** to `SmartFXUI/smartfx`
+4. Add the following **Environment Variables** in Vercel dashboard:
+
+```
+NEXT_PUBLIC_CELOFX_ADDRESS=0xA127C6aECb272935466B679234Ece1BFdF1953b7
+NEXT_PUBLIC_CHAIN_ID=44787
+NEXT_PUBLIC_RPC_URL=https://alfajores-forno.celo-testnet.org
+NEXT_PUBLIC_EXPLORER=https://alfajores.celoscan.io
+NEXT_PUBLIC_FROM_TOKEN=0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1
+NEXT_PUBLIC_TO_TOKEN=0x7D00cd74FF385c955EA3d79e47BF06bD7386387D
+```
+
+5. Deploy! Vercel will automatically rebuild on every push to main branch.
 
 
 🔗 Smart Contract
