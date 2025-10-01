@@ -1,19 +1,34 @@
-import { BrowserProvider, Contract, AbiCoder, keccak256, toUtf8Bytes, parseUnits } from "ethers";
+import {
+  BrowserProvider,
+  Contract,
+  AbiCoder,
+  keccak256,
+  toUtf8Bytes,
+  parseUnits,
+  getBytes, // <- use this instead of Buffer in the browser
+} from "ethers";
 import ABI from "../abi/SmartFX.json";
 
 const CELOFX = process.env.NEXT_PUBLIC_CELOFX_ADDRESS!;
 const FROM = process.env.NEXT_PUBLIC_FROM_TOKEN!;
-const TO   = process.env.NEXT_PUBLIC_TO_TOKEN!;
+const TO = process.env.NEXT_PUBLIC_TO_TOKEN!;
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 44787);
 
-function toFixed8(n: number){ return BigInt(Math.round(n * 1e8)); }
+function toFixed8(n: number) {
+  return BigInt(Math.round(n * 1e8));
+}
 
 // keccak256(abi.encode( keccak256("CELOFX_RATE_V1"), chainId, contract, from, to, rate, ts ))
-function buildQuoteHash(fromToken: string, toToken: string, rateFixed8: bigint, timestamp: number){
+function buildQuoteHash(
+  fromToken: string,
+  toToken: string,
+  rateFixed8: bigint,
+  timestamp: number
+) {
   const coder = new AbiCoder();
   const sentinel = keccak256(toUtf8Bytes("CELOFX_RATE_V1"));
   const encoded = coder.encode(
-    ["bytes32","uint256","address","address","address","uint256","uint256"],
+    ["bytes32", "uint256", "address", "address", "address", "uint256", "uint256"],
     [sentinel, BigInt(CHAIN_ID), CELOFX, fromToken, toToken, rateFixed8, BigInt(timestamp)]
   );
   return keccak256(encoded); // 0x...
@@ -25,7 +40,10 @@ export async function fetchFxRate(): Promise<number> {
   const attempts: Array<() => Promise<number>> = [
     // 1) exchangerate.host
     async () => {
-      const r = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=BRL", { cache: "no-cache" });
+      const r = await fetch(
+        "https://api.exchangerate.host/latest?base=USD&symbols=BRL",
+        { cache: "no-cache" }
+      );
       const j = await r.json();
       const brl = j?.rates?.BRL;
       if (typeof brl === "number" && isFinite(brl)) return brl;
@@ -33,7 +51,9 @@ export async function fetchFxRate(): Promise<number> {
     },
     // 2) ER API
     async () => {
-      const r = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-cache" });
+      const r = await fetch("https://open.er-api.com/v6/latest/USD", {
+        cache: "no-cache",
+      });
       const j = await r.json();
       const brl = j?.rates?.BRL;
       if (typeof brl === "number" && isFinite(brl)) return brl;
@@ -41,7 +61,10 @@ export async function fetchFxRate(): Promise<number> {
     },
     // 3) Frankfurter
     async () => {
-      const r = await fetch("https://api.frankfurter.app/latest?from=USD&to=BRL", { cache: "no-cache" });
+      const r = await fetch(
+        "https://api.frankfurter.app/latest?from=USD&to=BRL",
+        { cache: "no-cache" }
+      );
       const j = await r.json();
       const brl = j?.rates?.BRL;
       if (typeof brl === "number" && isFinite(brl)) return brl;
@@ -51,7 +74,11 @@ export async function fetchFxRate(): Promise<number> {
 
   let lastErr: any;
   for (const fn of attempts) {
-    try { return await fn(); } catch (e) { lastErr = e; }
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+    }
   }
   throw new Error("All FX providers failed: " + (lastErr?.message || lastErr));
 }
@@ -59,34 +86,60 @@ export async function fetchFxRate(): Promise<number> {
 // Sign a quote in the browser with MetaMask (MUST be the eigenSigner address)
 export async function signQuoteInBrowser(rateNumber: number) {
   const rate = toFixed8(rateNumber);
-  const timestamp = Math.floor(Date.now()/1000);
+  const timestamp = Math.floor(Date.now() / 1000);
 
   const { ethereum } = window as any;
+  if (!ethereum) throw new Error("No wallet found");
+
   const provider = new BrowserProvider(ethereum);
   const signer = await provider.getSigner();
 
   const qh = buildQuoteHash(FROM, TO, rate, timestamp);
-  const sig = await signer.signMessage(Buffer.from(qh.slice(2), "hex")); // EIP-191 prefix
+  // ethers v6: getBytes(hex) -> Uint8Array; signMessage adds EIP-191 prefix internally
+  const sig = await signer.signMessage(getBytes(qh));
 
-  return { fromToken: FROM, toToken: TO, rate: rate.toString(), timestamp, signature: sig };
+  return {
+    fromToken: FROM,
+    toToken: TO,
+    rate: rate.toString(),
+    timestamp,
+    signature: sig,
+  };
 }
 
-export function calcMinOut(amountInStr: string, rateNumber: number, slippageBps = 50): bigint {
+export function calcMinOut(
+  amountInStr: string,
+  rateNumber: number,
+  slippageBps = 50
+): bigint {
   // minOut = amountIn * rate * (1 - slippageBps/10_000)
   const amountIn18 = parseUnits(amountInStr || "0", 18);
   const rateFixed8 = toFixed8(rateNumber);
-  // (amountIn18 * rateFixed8 / 1e8) * (1 - s)
-  const out18 = (amountIn18 * rateFixed8) / BigInt(1e8);
-  const outAfterSlippage = (out18 * BigInt(10000 - slippageBps)) / BigInt(10000);
-  return outAfterSlippage;
 
-export async function approveAndSwap(amountStr: string, rateNumber: number, quote:any) {
+  // (amountIn18 * rateFixed8 / 1e8) * (1 - s)
+  const out18 = (amountIn18 * rateFixed8) / BigInt(1e8); // 1e8
+  const outAfterSlippage =
+    (out18 * BigInt(10000 - slippageBps)) / BigInt(10000); // basis points
+  return outAfterSlippage;
+}
+
+export async function approveAndSwap(
+  amountStr: string,
+  rateNumber: number,
+  quote: any
+) {
   const { ethereum } = window as any;
+  if (!ethereum) throw new Error("No wallet found");
+
   const provider = new BrowserProvider(ethereum);
   const signer = await provider.getSigner();
 
   // 1) approve FROM token (cUSD)
-  const erc20 = new Contract(FROM, ["function approve(address,uint256) returns (bool)"], signer);
+  const erc20 = new Contract(
+    FROM,
+    ["function approve(address,uint256) returns (bool)"],
+    signer
+  );
   const amountIn = parseUnits(amountStr || "0", 18);
   await (await erc20.approve(CELOFX, amountIn)).wait();
 
@@ -104,5 +157,4 @@ export async function approveAndSwap(amountStr: string, rateNumber: number, quot
     await signer.getAddress()
   );
   return tx.wait();
-}
 }
