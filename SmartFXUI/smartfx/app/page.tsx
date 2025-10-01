@@ -1,101 +1,226 @@
 "use client";
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { connectWallet, ensureCeloNetwork } from "../lib/wallet";
-import { fetchFxRate, signQuoteInBrowser } from "../lib/fx";
+import { fetchFxRate, signQuoteInBrowser, approveAndSwap } from "../lib/fx"; // <-- import approveAndSwap
 
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER || "https://alfajores.celoscan.io";
 
-export default function Home(){
-  const [addr,setAddr] = useState("");
-  const [amt,setAmt] = useState("10");
-  const [rate,setRate] = useState<number|undefined>();
-  const [quote,setQuote] = useState<any>(null);
-  const [hash,setHash] = useState("");
-  const [loading,setLoading] = useState(false);
-  const [err,setErr] = useState("");
+type Quote = {
+  fromToken: string;
+  toToken: string;
+  rate: string;      // 1e8 fixed-point encoded as string
+  timestamp: number;
+  signature: string;
+};
 
-  async function connect(){
-    try { await ensureCeloNetwork(); setAddr(await connectWallet()); }
-    catch(e:any){ setErr(e?.message||String(e)); }
-  }
+function errMsg(e: unknown) {
+  return e instanceof Error ? e.message : String(e);
+}
 
-  async function getRate(){
-    setErr(""); setLoading(true);
-    try { setRate(await fetchFxRate()); }
-    catch(e:any){ setErr("Rate fetch failed: "+(e?.message||String(e))); }
-    finally { setLoading(false); }
-  }
+export default function Home() {
+  const [addr, setAddr] = useState("");
+  const [amt, setAmt] = useState("10");
+  const [rate, setRate] = useState<number | undefined>();
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [hash, setHash] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
-  async function signRate(){
-    if(rate===undefined){ setErr("Fetch or enter a rate first"); return; }
-    setErr(""); setLoading(true);
-    try { setQuote(await signQuoteInBrowser(rate)); }
-    catch(e:any){ setErr("Sign failed: "+(e?.message||String(e))); }
-    finally { setLoading(false); }
-  }
-
-  async function swap(){
-    if(!quote || rate===undefined){ setErr("Sign a quote first"); return; }
-    setErr(""); setLoading(true);
-    try { 
-      const rec: any = await approveAndSwap(amt, rate, quote); 
-      setHash((rec && typeof rec === "object" && "hash" in rec) ? (rec.hash || "") : ""); 
+  async function connect() {
+    try {
+      await ensureCeloNetwork();
+      setAddr(await connectWallet());
+    } catch (e) {
+      setErr(errMsg(e));
     }
-    catch(e:any){ setErr("Swap failed: "+(e?.message||String(e))); }
-    finally { setLoading(false); }
   }
 
-  const rateText = useMemo(()=> rate!==undefined ? `${rate.toFixed(4)} cREAL / 1 cUSD` : "-", [rate]);
-  const btn = (label:string, onClick:any, disabled:boolean=false) => (
-    <button onClick={onClick} disabled={disabled}
-      style={{padding:"10px 14px", borderRadius:12, border:"1px solid #ddd", background:"#111", color:"#fff", marginRight:8}}>
+  async function getRate() {
+    setErr("");
+    setLoading(true);
+    try {
+      setRate(await fetchFxRate());
+    } catch (e) {
+      setErr("Rate fetch failed: " + errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signRate() {
+    if (rate === undefined) {
+      setErr("Fetch or enter a rate first");
+      return;
+    }
+    setErr("");
+    setLoading(true);
+    try {
+      const q = await signQuoteInBrowser(rate);
+      setQuote(q);
+    } catch (e) {
+      setErr("Sign failed: " + errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function swap() {
+    if (!quote || rate === undefined) {
+      setErr("Sign a quote first");
+      return;
+    }
+    setErr("");
+    setLoading(true);
+    try {
+      const rec = await approveAndSwap(amt, rate, quote);
+      // ethers v6 waits return a TxReceipt with .hash usually present
+      // fall back to empty string if undefined
+      setHash(rec?.hash || "");
+    } catch (e) {
+      setErr("Swap failed: " + errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const rateText = useMemo(
+    () => (rate !== undefined ? `${rate.toFixed(4)} cREAL / 1 cUSD` : "-"),
+    [rate]
+  );
+
+  const btn = (label: string, onClick: () => void, disabled = false) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: disabled ? "#444" : "#111",
+        color: "#fff",
+        marginRight: 8,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
       {label}
     </button>
   );
 
   return (
-    <main style={{maxWidth:620, margin:"40px auto", padding:24, fontFamily:"Inter, system-ui"}}>
-      <h1 style={{fontSize:26, fontWeight:800}}>SmartFX</h1>
-      <p style={{opacity:.75, marginTop:6}}>Your wallet signs the rate. Contract verifies it on-chain.</p>
-
-      <div style={{marginTop:16}}>
-        {!addr ? btn("Connect Wallet (Celo)", connect) : <div>Connected: <b>{addr.slice(0,6)}…{addr.slice(-4)}</b></div>}
+    <main
+      style={{
+        maxWidth: 720,
+        margin: "40px auto",
+        padding: 24,
+        fontFamily: "Inter, system-ui",
+      }}
+    >
+      {/* Logo row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <Image
+          src="/logo.png"            // or "/logo.svg"
+          alt="SmartFX logo"
+          width={40}
+          height={40}
+          priority
+        />
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0 }}>SmartFX</h1>
+          <p style={{ opacity: 0.75, margin: 0, marginTop: 4 }}>
+            Your wallet signs the rate. Contract verifies it on-chain.
+          </p>
+        </div>
       </div>
 
-      <div style={{marginTop:18}}>
+      <div style={{ marginTop: 16 }}>
+        {!addr
+          ? btn("Connect Wallet (Celo)", connect)
+          : (
+            <div>
+              Connected: <b>{addr.slice(0, 6)}…{addr.slice(-4)}</b>
+            </div>
+          )}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
         <label>Amount (cUSD)</label>
-        <input value={amt} onChange={e=>setAmt(e.target.value)}
-          style={{display:"block", width:"100%", marginTop:6, padding:12, borderRadius:12, border:"1px solid #e5e5e5"}} />
+        <input
+          value={amt}
+          onChange={(e) => setAmt(e.target.value)}
+          style={{
+            display: "block",
+            width: "100%",
+            marginTop: 6,
+            padding: 12,
+            borderRadius: 12,
+            border: "1px solid #e5e5e5",
+          }}
+        />
       </div>
 
-      <div style={{marginTop:14}}>
+      <div style={{ marginTop: 14 }}>
         {btn(loading ? "Fetching…" : "Get Rate (USD→BRL)", getRate, loading)}
         <span>Rate: <b>{rateText}</b></span>
       </div>
 
-      <div style={{marginTop:10}}>
-        <small style={{opacity:.7}}>Or type a custom rate:</small>
-        <input placeholder="e.g. 5.10" onChange={(e)=>setRate(Number(e.target.value))}
-          style={{display:"block", width:"100%", marginTop:6, padding:10, borderRadius:10, border:"1px solid #eee"}} />
+      <div style={{ marginTop: 10 }}>
+        <small style={{ opacity: 0.7 }}>Or type a custom rate:</small>
+        <input
+          placeholder="e.g. 5.10"
+          onChange={(e) => setRate(Number(e.target.value))}
+          style={{
+            display: "block",
+            width: "100%",
+            marginTop: 6,
+            padding: 10,
+            borderRadius: 10,
+            border: "1px solid #eee",
+          }}
+        />
       </div>
 
-      <div style={{marginTop:14}}>
-        {btn(loading ? "Signing…" : "Sign Verified Rate", signRate, loading || rate===undefined)}
+      <div style={{ marginTop: 14 }}>
+        {btn(loading ? "Signing…" : "Sign Verified Rate", signRate, loading || rate === undefined)}
         {btn(loading ? "Swapping…" : "Swap at Verified Rate", swap, loading || !quote)}
       </div>
 
-      {quote && <details style={{marginTop:12}}><summary>Show proof</summary>
-        <pre style={{background:"#000", padding:12, borderRadius:10, fontSize:12}}>
-{JSON.stringify(quote,null,2)}
-        </pre>
-      </details>}
+      {quote && (
+        <details style={{ marginTop: 12 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Show proof</summary>
+          <pre
+            style={{
+              background: "#f6f8fa",
+              color: "#0a0a0a",
+              padding: 12,
+              borderRadius: 10,
+              fontSize: 12,
+              overflowX: "auto",
+              border: "1px solid #e5e7eb",
+              marginTop: 8,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {JSON.stringify(quote, null, 2)}
+          </pre>
+        </details>
+      )}
 
-      {hash && <p style={{marginTop:12}}>Tx: <a href={`${EXPLORER}/tx/${hash}`} target="_blank" rel="noreferrer">{hash.slice(0,12)}…</a></p>}
-      {err && <p style={{marginTop:12, color:"#c00"}}>{err}</p>}
+      {hash && (
+        <p style={{ marginTop: 12 }}>
+          Tx:{" "}
+          <a
+            href={`${EXPLORER}/tx/${hash}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {hash.slice(0, 12)}…
+          </a>
+        </p>
+      )}
+
+      {err && <p style={{ marginTop: 12, color: "#c00" }}>{err}</p>}
     </main>
   );
 }
-function approveAndSwap(amt: string, rate: number, quote: any) {
-  throw new Error("Function not implemented.");
-}
-
